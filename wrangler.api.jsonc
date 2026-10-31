@@ -1,0 +1,33 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "riplay-api",
+  "main": "workers/api/index.ts",
+  "compatibility_date": "2026-10-30",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "riplay-db",
+      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    { "binding": "MEDIA", "bucket_name": "riplay-media" }
+  ],
+  "queues": {
+    "producers": [
+      { "binding": "GENERATION_QUEUE", "queue": "riplay-generation" }
+    ],
+    "consumers": [
+      {
+        "queue": "riplay-generation",
+        "max_batch_size": 5,
+        "max_batch_timeout": 5,
+        "max_retries": 3,
+        "dead_letter_queue": "riplay-generation-dlq"
+      }
+    ]
+  }
+}
