@@ -7,7 +7,7 @@ export interface Cosmos3Request {
   fps: number;
 }
 
-export async function generateCosmos3NanoVideo(input: Cosmos3Request): Promise<Uint8Array> {
+export async function generateCosmos3NanoVideo(input: Cosmos3Request): Promise<{ bytes: Uint8Array; durationSeconds: number }> {
   if (!input.apiKey) throw new Error("nvidia_api_key_missing");
   const response = await fetch(input.endpoint || "https://ai.api.nvidia.com/v1/cosmos/nvidia/cosmos3-nano", {
     method: "POST",
@@ -34,7 +34,7 @@ export async function generateCosmos3NanoVideo(input: Cosmos3Request): Promise<U
   const binary = atob(payload.b64_video);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes;
+  return { bytes, durationSeconds: input.frames / input.fps };
 }
 
 export interface FalKlingRequest {
