@@ -202,20 +202,41 @@ export default {
 
       const assetId = crypto.randomUUID();
       const objectKey = `users/${encodeURIComponent(user.id)}/assets/${assetId}`;
+      let receivedBytes = 0;
+      const limitedBody = request.body.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({
+        transform(chunk, controller) {
+          receivedBytes += chunk.byteLength;
+          if (receivedBytes > MAX_UPLOAD_BYTES || receivedBytes > length) {
+            throw new Error("upload_size_limit_exceeded");
+          }
+          controller.enqueue(chunk);
+        }
+      }));
+
       try {
-        await env.MEDIA.put(objectKey, request.body, {
+        await env.MEDIA.put(objectKey, limitedBody, {
           httpMetadata: { contentType },
           customMetadata: { ownerId: user.id, assetId }
         });
+        if (receivedBytes !== length) {
+          await env.MEDIA.delete(objectKey);
+          return json({ error: "content_length_mismatch" }, 400, origin);
+        }
       } catch {
-        return json({ error: "storage_unavailable" }, 503, origin);
+        await env.MEDIA.delete(objectKey).catch(() => undefined);
+        return json({ error: "storage_unavailable_or_size_limit" }, 413, origin);
       }
 
-      await env.DB.prepare(
+      try {
+        await env.DB.prepare(
         `INSERT INTO media_assets
           (id, owner_id, project_id, object_key, media_type, content_type, size_bytes)
          VALUES (?, ?, ?, ?, ?, ?, ?)`
       ).bind(assetId, user.id, projectId, objectKey, mediaType, contentType, length).run();
+      } catch {
+        await env.MEDIA.delete(objectKey).catch(() => undefined);
+        return json({ error: "asset_record_failed" }, 503, origin);
+      }
 
       return json({ id: assetId, mediaType, contentType, sizeBytes: length }, 201, origin);
     }
