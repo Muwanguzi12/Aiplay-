@@ -1,31 +1,23 @@
 # Riplay — powered by Aiplay
 
-**Riplay** is an AI-powered creative studio for music, video and social publishing. **Aiplay** is its video-generation engine.
+**Riplay** is an AI-powered creative studio for music, video and social storytelling. **Aiplay** is its video-generation engine.
 
-> Your imagination. Your sound. Your visual story.
+> Your ideas. In another dimension.
 
-## Product direction
+## Studio experience
 
-Riplay is being designed to help creators turn an idea into a short, polished video: describe the concept, develop a storyboard, generate or upload media, arrange scenes, preview the result, and export it for social platforms.
+- Animated dark and light themes.
+- Responsive creative-studio layout and motion effects.
+- Prompt composer, aspect-ratio selection and quick-start directions.
+- Visual inspiration gallery with source links.
+- Reduced-motion accessibility support.
+- Honest preview messaging: the interface does not claim AI generation is live.
 
-A core product focus is authentic African creativity: regional storytelling, music styles, languages and voice experiences. These capabilities must be validated with consenting native speakers before being advertised as supported.
+## Stack
 
-## Current status
+Next.js 15, React, TypeScript and a Cloudflare Workers/D1/R2/Queues deployment foundation.
 
-This repository is the initial foundation. The first milestone is a responsive web studio shell and a provider-neutral Aiplay job contract. Live model generation, media rendering, user accounts, storage and social publishing are not yet implemented.
-
-## Planned architecture
-
-- **Web studio:** Next.js + TypeScript.
-- **Aiplay API:** asynchronous generation jobs with status and result records.
-- **AI provider adapters:** model-specific integrations behind a common interface.
-- **Media pipeline:** validate, store, assemble and export user-authorized assets.
-- **Cloud infrastructure:** Cloudflare Workers and R2 are the intended deployment direction.
-- **Social publishing:** official platform APIs and OAuth authorization only.
-
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [services/aiplay-engine/README.md](services/aiplay-engine/README.md).
-
-## Local development
+## Run locally
 
 Requirements: Node.js 20.9+ and npm.
 
@@ -36,25 +28,27 @@ npm run dev
 
 Open http://localhost:3000.
 
-## Environment variables
+## Project links
 
-Copy `.env.example` to `.env.local` when local environment configuration is needed. Never commit real API keys, OAuth secrets, access tokens or passwords.
+- [GitHub repository](https://github.com/Muwanguzi12/Aiplay-)
+- [Cloudflare setup](docs/CLOUDFLARE_SETUP.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Aiplay engine](services/aiplay-engine/README.md)
+- [Unsplash photography](https://unsplash.com)
 
-## Roadmap
+## Production readiness
 
-1. [x] Establish the repository and product architecture.
-2. [x] Add the initial Riplay studio shell.
-3. [x] Define the provider-neutral Aiplay job contract.
-4. [ ] Add authentication and project persistence.
-5. [ ] Add a real, licensed video-generation provider.
-6. [ ] Add secure media storage and asynchronous rendering.
-7. [ ] Add export presets and publishing integrations.
-8. [ ] Test African language and voice experiences with consenting speakers.
+This repository has a Cloudflare deployment foundation and a restricted-beta identity gate. It is **not production-ready**. Remaining work:
+1. Configure Cloudflare account resources, domains and environment variables.
+2. Run type checks, builds, integration tests and staging deployment.
+3. Add public consumer authentication (Cloudflare Access is only a beta gate).
+4. Add durable rate limiting and per-user storage quotas.
+5. Validate media signatures, dimensions, duration and safe content.
+6. Connect and test a licensed AI video-generation provider.
+7. Add monitoring, billing/cost limits, backups and incident procedures.
 
-## Responsible use
-
-Only upload media you own or have permission to use. Obtain clear permission before using someone's likeness or voice. Social publishing must be an explicit user action, with platform permissions and terms respected.
+Never commit credentials. Obtain permission before using someone's voice or likeness. Social publishing must use official platform APIs and explicit user authorization.
 
 ## License
 
-This project is licensed under the MIT License. See [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE).
