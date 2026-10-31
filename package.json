@@ -7,7 +7,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "cf:types": "wrangler types",
+    "cf:dev:api": "wrangler dev --config wrangler.api.jsonc",
+    "cf:deploy:api": "wrangler deploy --config wrangler.api.jsonc",
+    "cf:preview:web": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "cf:deploy:web": "opennextjs-cloudflare build && opennextjs-cloudflare deploy"
   },
   "dependencies": {
     "next": "^15.5.0",
@@ -15,11 +20,14 @@
     "react-dom": "^19.1.0"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "latest",
+    "@opennextjs/cloudflare": "latest",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "eslint": "^9.0.0",
     "eslint-config-next": "^15.5.0",
-    "typescript": "^5.8.0"
+    "typescript": "^5.8.0",
+    "wrangler": "latest"
   }
 }
