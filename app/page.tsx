@@ -29,7 +29,7 @@ async function create(){
   if(!prompt.trim()){setNotice("Add an idea first — even one sentence is enough.");return;}
   const client=getSupabase();
   if(!client){setNotice("Sign in before creating a video.");setAuthOpen(true);return;}
-  const apiBase=(process.env.NEXT_PUBLIC_AIPLAY_API_URL||"").replace(/\\/$/,"");
+  const apiBase=(process.env.NEXT_PUBLIC_AIPLAY_API_URL||"").replace(/\/+$/g,"");
   if(!apiBase){setNotice("The Aiplay API address is not configured yet.");return;}
   setGenerating(true);setVideoUrl(null);setNotice("Preparing your generation…");
   try{
