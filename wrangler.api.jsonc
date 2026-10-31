@@ -3,12 +3,16 @@
   "name": "riplay-api",
   "main": "workers/api/index.ts",
   "compatibility_date": "2026-10-30",
-  "compatibility_flags": ["nodejs_compat"],
-  "observability": { "enabled": true },
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "observability": {
+    "enabled": true
+  },
   "vars": {
-    "TEAM_DOMAIN": "https://YOUR-TEAM.cloudflareaccess.com",
-    "POLICY_AUD": "REPLACE_WITH_ACCESS_APPLICATION_AUD",
-    "ALLOWED_ORIGIN": "https://YOUR-RIPLAY-DOMAIN"
+    "ALLOWED_ORIGIN": "https://YOUR-RIPLAY-DOMAIN",
+    "SUPABASE_URL": "https://YOUR-PROJECT-REF.supabase.co",
+    "SUPABASE_ANON_KEY": "REPLACE_WITH_SUPABASE_PUBLISHABLE_OR_ANON_KEY"
   },
   "d1_databases": [
     {
@@ -19,11 +23,17 @@
     }
   ],
   "r2_buckets": [
-    { "binding": "MEDIA", "bucket_name": "riplay-media" }
+    {
+      "binding": "MEDIA",
+      "bucket_name": "riplay-media"
+    }
   ],
   "queues": {
     "producers": [
-      { "binding": "GENERATION_QUEUE", "queue": "riplay-generation" }
+      {
+        "binding": "GENERATION_QUEUE",
+        "queue": "riplay-generation"
+      }
     ],
     "consumers": [
       {
