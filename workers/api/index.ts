@@ -184,7 +184,7 @@ export default {
     const jobMatch = url.pathname.match(/^\/v1\/jobs\/([0-9a-f-]{36})$/i);
     if (jobMatch && request.method === "GET") {
       const row = await env.DB.prepare(
-        `SELECT j.id, j.status, j.provider, j.error_code, j.created_at, j.updated_at,
+        `SELECT j.id, j.provider, j.created_at, j.updated_at,
                 a.id AS output_asset_id, j.output_duration_seconds,
                 CASE WHEN j.output_expires_at IS NOT NULL AND j.output_expires_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now') THEN 'failed' ELSE j.status END AS status,
                 CASE WHEN j.output_expires_at IS NOT NULL AND j.output_expires_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now') THEN 'output_expired' ELSE j.error_code END AS error_code
