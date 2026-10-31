@@ -23,7 +23,7 @@ Next.js 15, React, TypeScript, Supabase Auth, and a Cloudflare Workers/D1/R2/Que
 2. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in `.env.local`.
 3. In Supabase Authentication → URL Configuration, add your local and production app URLs to the allowed redirect URLs.
 4. Enable Google as an OAuth provider in Supabase and configure its provider credentials in the Supabase dashboard.
-5. For the Worker, set `SUPABASE_URL` and the Supabase publishable/anon key as encrypted Worker variables/secrets. The Worker validates each bearer access token against Supabase Auth `/auth/v1/user`; it never trusts a user ID supplied by the browser.
+5. For the Worker, set `SUPABASE_URL` and `SUPABASE_ANON_KEY` in the Worker environment (the publishable/anon key is not a service-role secret). The Worker validates each bearer access token against Supabase Auth `/auth/v1/user`; it never trusts a user ID supplied by the browser.
 6. Configure the email provider and templates in Supabase before relying on email-link sign-in.
 
 The browser uses the Supabase PKCE flow. The publishable key is intended for browser use; never put a service-role/secret key in `NEXT_PUBLIC_*` or commit it. Restrict redirect URLs to your own domains.
