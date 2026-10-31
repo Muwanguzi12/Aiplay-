@@ -12,7 +12,8 @@
     "cf:dev:api": "wrangler dev --config wrangler.api.jsonc",
     "cf:deploy:api": "wrangler deploy --config wrangler.api.jsonc",
     "cf:preview:web": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
-    "cf:deploy:web": "opennextjs-cloudflare build && opennextjs-cloudflare deploy"
+    "cf:deploy:web": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "cf:build:web": "opennextjs-cloudflare build"
   },
   "dependencies": {
     "next": "^15.5.0",
