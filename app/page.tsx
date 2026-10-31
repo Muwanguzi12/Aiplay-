@@ -4,8 +4,8 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 let supabase: SupabaseClient | null = null;
 function getSupabase(){
-  const url=process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key=process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  const url=process.env.NEXT_PUBLIC_SUPABASE_URL || "https://dxcklcpxoxlmrbaqsxqi.supabase.co";
+  const key=process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || "sb_publishable_-ThqstC0cdoGJthQZxpwfg_gUt081uZ";
   if(!url || !key) return null;
   if(!supabase) supabase=createClient(url,key,{auth:{flowType:"pkce",detectSessionInUrl:true,persistSession:true,autoRefreshToken:true}});
   return supabase;
