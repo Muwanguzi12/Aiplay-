@@ -22,3 +22,6 @@
 .auth-message{margin:14px 0;color:var(--accent,#9bd9ff);font-size:13px;line-height:1.5}
 .auth-dialog .privacy-note{margin-top:18px}
 .auth-dialog button:disabled{opacity:.6;cursor:wait}
+
+
+.generated-preview{display:grid;gap:10px;margin-top:18px}.generated-preview video{width:100%;max-height:520px;border-radius:16px;background:#080808}.generated-preview a{color:var(--accent,#8b7cff);font-size:13px;text-decoration:none}.generate-button:disabled{opacity:.6;cursor:wait}
