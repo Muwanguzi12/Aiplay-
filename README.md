@@ -15,7 +15,18 @@
 
 ## Stack
 
-Next.js 15, React, TypeScript and a Cloudflare Workers/D1/R2/Queues deployment foundation.
+Next.js 15, React, TypeScript, Supabase Auth, and a Cloudflare Workers/D1/R2/Queues deployment foundation.
+
+## Supabase Auth setup
+
+1. Create a Supabase project and copy its Project URL and publishable key.
+2. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in `.env.local`.
+3. In Supabase Authentication → URL Configuration, add your local and production app URLs to the allowed redirect URLs.
+4. Enable Google as an OAuth provider in Supabase and configure its provider credentials in the Supabase dashboard.
+5. For the Worker, set `SUPABASE_URL` and the Supabase publishable/anon key as encrypted Worker variables/secrets. The Worker validates each bearer access token against Supabase Auth `/auth/v1/user`; it never trusts a user ID supplied by the browser.
+6. Configure the email provider and templates in Supabase before relying on email-link sign-in.
+
+The browser uses the Supabase PKCE flow. The publishable key is intended for browser use; never put a service-role/secret key in `NEXT_PUBLIC_*` or commit it. Restrict redirect URLs to your own domains.
 
 ## Run locally
 
@@ -41,7 +52,7 @@ Open http://localhost:3000.
 This repository has a Cloudflare deployment foundation and a restricted-beta identity gate. It is **not production-ready**. Remaining work:
 1. Configure Cloudflare account resources, domains and environment variables.
 2. Run type checks, builds, integration tests and staging deployment.
-3. Add public consumer authentication (Cloudflare Access is only a beta gate).
+3. Configure Supabase project credentials, Google OAuth provider credentials, email delivery, and production redirect URLs.
 4. Add durable rate limiting and per-user storage quotas.
 5. Validate media signatures, dimensions, duration and safe content.
 6. Connect and test a licensed AI video-generation provider.
