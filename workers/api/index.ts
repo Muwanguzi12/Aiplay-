@@ -4,8 +4,8 @@ interface Env {
   DB: D1Database;
   MEDIA: R2Bucket;
   GENERATION_QUEUE: Queue<GenerationMessage>;
-  TEAM_DOMAIN: string;
-  POLICY_AUD: string;
+  SUPABASE_URL: string;
+  SUPABASE_ANON_KEY: string;
   ALLOWED_ORIGIN: string;
 }
 
@@ -48,23 +48,20 @@ const json = (data: unknown, status = 200, origin = "*") =>
   });
 
 async function authenticate(request: Request, env: Env): Promise<AuthUser | null> {
-  if (!env.TEAM_DOMAIN || !env.POLICY_AUD) return null;
-  const token = request.headers.get("cf-access-jwt-assertion");
-  if (!token) return null;
+  const authorization = request.headers.get("authorization") ?? "";
+  const match = authorization.match(/^Bearer\\s+(.+)$/i);
+  if (!match || !env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) return null;
   try {
-    const issuer = new URL(env.TEAM_DOMAIN).origin;
-    const jwks = createRemoteJWKSet(
-      new URL("/cdn-cgi/access/certs", issuer)
-    );
-    const { payload } = await jwtVerify(token, jwks, {
-      issuer,
-      audience: env.POLICY_AUD
+    const response = await fetch(`${env.SUPABASE_URL.replace(/\\/$/, "")}/auth/v1/user`, {
+      headers: {
+        apikey: env.SUPABASE_ANON_KEY,
+        authorization: `Bearer ${match[1]}`
+      }
     });
-    if (typeof payload.sub !== "string" || !payload.sub) return null;
-    return {
-      id: payload.sub,
-      email: typeof payload.email === "string" ? payload.email : undefined
-    };
+    if (!response.ok) return null;
+    const user = await response.json() as { id?: unknown; email?: unknown };
+    if (typeof user.id !== "string" || !user.id) return null;
+    return { id: user.id, email: typeof user.email === "string" ? user.email : undefined };
   } catch {
     return null;
   }
@@ -76,7 +73,7 @@ function corsHeaders(origin: string, env: Env): HeadersInit {
   return {
     "access-control-allow-origin": accepted,
     "access-control-allow-methods": "GET, POST, OPTIONS",
-    "access-control-allow-headers": "content-type, cf-access-jwt-assertion",
+    "access-control-allow-headers": "content-type, authorization",
     "access-control-max-age": "86400",
     "vary": "Origin"
   };
