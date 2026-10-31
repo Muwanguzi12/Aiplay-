@@ -1,62 +1,26 @@
 "use client";
-
 import { useState } from "react";
-
-const starters = [
-  { title: "Music video", detail: "Turn a track into a visual story", icon: "♫" },
-  { title: "Social clip", detail: "Create a vertical short for your audience", icon: "▣" },
-  { title: "Story scene", detail: "Bring a single scene to life", icon: "✳" }
-];
-
-export default function Home() {
-  const [prompt, setPrompt] = useState("");
-  const [format, setFormat] = useState("9:16");
-  const [notice, setNotice] = useState("");
-
-  function startProject() {
-    if (!prompt.trim()) {
-      setNotice("Add an idea first — even one sentence is enough.");
-      return;
-    }
-    setNotice("Studio foundation is ready. Generation will be connected in the next build step.");
-  }
-
-  return (
-    <main className="shell">
-      <aside className="sidebar">
-        <a className="brand" href="#" aria-label="Riplay home"><span className="brand-mark">R</span><span>riplay</span></a>
-        <div className="workspace-label">WORKSPACE</div>
-        <button className="nav-item active"><span>◈</span> Create</button>
-        <button className="nav-item" onClick={() => setNotice("Your projects library is coming next.")}><span>▤</span> My projects</button>
-        <button className="nav-item" onClick={() => setNotice("The creator marketplace is on the roadmap.")}><span>◇</span> Discover</button>
-        <div className="sidebar-bottom">
-          <div className="engine-status"><span className="status-dot" /> Aiplay engine <small>Foundation</small></div>
-          <div className="profile"><div className="avatar">R</div><div><strong>Creator workspace</strong><small>Local preview</small></div><span className="more">···</span></div>
-        </div>
-      </aside>
-
-      <section className="main-panel">
-        <header className="topbar"><div className="crumb">Workspace <span>/</span> <b>Create</b></div><div className="top-actions"><span className="plan">EARLY ACCESS</span><button className="help" onClick={() => setNotice("Riplay help and documentation are being prepared.")}>Help ↗</button></div></header>
-        <div className="content">
-          <div className="eyebrow"><span className="spark">✳</span> YOUR CREATIVE SPACE</div>
-          <h1>Make something<br /><em>worth watching.</em></h1>
-          <p className="intro">One idea can become a soundtrack, a story and a video.<br className="desktop-break" /> Start with a thought. Shape it into your next creation.</p>
-
-          <section className="prompt-card">
-            <div className="card-heading"><div><span className="step">01</span><strong>Describe your idea</strong></div><span className="ai-label">AIPLAY · VIDEO ENGINE</span></div>
-            <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="A cinematic music video set in Kampala at golden hour, with boda bodas moving through the city..." rows={4} />
-            <div className="prompt-footer"><span>Be vivid. Describe the mood, setting and story.</span><span>{prompt.length}/600</span></div>
-            <div className="settings-row"><div><label>VIDEO FORMAT</label><div className="format-options">{["9:16", "16:9", "1:1"].map((f) => <button key={f} className={format === f ? "format selected" : "format"} onClick={() => setFormat(f)}>{f}</button>)}</div></div><div className="duration"><label>FIRST CUT</label><strong>15–30 sec <span>⌄</span></strong></div></div>
-            <button className="create-button" onClick={startProject}>Build my story <span>→</span></button>
-            {notice && <p className="notice" role="status">{notice}</p>}
-            <p className="fine-print">Your idea stays in this browser preview. No media is uploaded or generated yet.</p>
-          </section>
-
-          <div className="section-head"><div><span className="step">02</span><strong>Start with a format</strong></div><span>CHOOSE A CREATIVE DIRECTION</span></div>
-          <div className="starter-grid">{starters.map((item) => <button className="starter" key={item.title} onClick={() => { setPrompt(item.detail + ". "); setNotice(""); }}><span className="starter-icon">{item.icon}</span><span><strong>{item.title}</strong><small>{item.detail}</small></span><b>↗</b></button>)}</div>
-          <footer className="footer-note"><span>✳ Made for every kind of creator.</span><span>RIPLAY STUDIO · 0.1.0</span></footer>
-        </div>
-      </section>
-    </main>
-  );
-}
+const cards=[
+{title:"City afterglow",tag:"CINEMATIC · 9:16",src:"https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=1000&q=85",alt:"City skyline at dusk"},
+{title:"Sound in motion",tag:"MUSIC VISUAL · 16:9",src:"https://images.unsplash.com/photo-1506157786151-b8491531f063?auto=format&fit=crop&w=1000&q=85",alt:"Live music crowd"},
+{title:"A different world",tag:"STORY SCENE · 1:1",src:"https://images.unsplash.com/photo-1470252649378-9c29740c9fa8?auto=format&fit=crop&w=1000&q=85",alt:"Golden sunrise landscape"}];
+const starters=[
+{title:"Music video",desc:"Give your sound a visual identity",icon:"♫",prompt:"A cinematic music video with expressive camera movement, atmospheric lighting and a strong visual rhythm."},
+{title:"Social short",desc:"Make a moment worth sharing",icon:"▣",prompt:"A punchy vertical social video with a clear opening, dynamic scenes and a memorable ending."},
+{title:"Story scene",desc:"Build a world in a few frames",icon:"✳",prompt:"A cinematic story scene with a distinctive setting, rich atmosphere and a clear emotional arc."}];
+export default function Home(){
+const [prompt,setPrompt]=useState("");const [format,setFormat]=useState("9:16");const [theme,setTheme]=useState<"dark"|"light">("dark");const [notice,setNotice]=useState("");
+function create(){setNotice(prompt.trim()?"Your concept is ready for the next step. Live AI generation is not connected yet.":"Add an idea first — even one sentence is enough.");}
+return <main className={`site-shell theme-${theme}`} id="home">
+<div className="ambient ambient-one"/><div className="ambient ambient-two"/>
+<header className="site-header"><a className="brand" href="#home"><span className="brand-mark">R</span>riplay<span className="brand-period">.</span></a>
+<nav className="main-nav"><a href="#studio">Studio</a><a href="#inspiration">Inspiration</a><a href="#about">About</a></nav>
+<div className="header-actions"><button className="theme-toggle" onClick={()=>setTheme(theme==="dark"?"light":"dark")} aria-label="Toggle theme">{theme==="dark"?"☼":"☾"} <small>{theme==="dark"?"Light":"Dark"}</small></button><a className="header-link" href="https://github.com/Muwanguzi12/Aiplay-" target="_blank" rel="noreferrer">GitHub ↗</a><a className="header-cta" href="#studio">Open studio ↗</a></div></header>
+<section className="hero"><div className="hero-copy"><div className="eyebrow"><i/> THE CREATIVE STUDIO FOR WHAT'S NEXT</div><h1>Your ideas.<br/><span className="gradient-text">In another dimension.</span></h1><p className="hero-intro">Shape a thought into a visual story. Build music-led videos, cinematic scenes and social-first creations with Riplay.</p><div className="hero-actions"><a className="primary-button" href="#studio">Create your first story ↗</a><a className="text-link" href="#inspiration">Explore the canvas ↓</a></div><div className="hero-meta"><span>✳ Built for bold ideas</span><span>◈ Powered by Aiplay</span></div></div>
+<div className="hero-art"><div className="orbit orbit-one"/><div className="orbit orbit-two"/><div className="hero-image"><img src="https://images.unsplash.com/photo-1534796636912-3b95b3ab5986?auto=format&fit=crop&w=1200&q=90" alt="Dreamlike star-filled night sky"/><div className="image-shade"/><div className="hero-image-caption"><small>01 / IMAGINE</small><b>Make the unreal<br/>feel real.</b></div></div><div className="floating-card floating-top">✦ <span><b>Creative freedom</b><small>Start with a spark</small></span></div><div className="floating-card floating-bottom">▂▅▃▇▅ <span><b>Sound meets vision</b><small>Your story, your rhythm</small></span></div></div></section>
+<section className="studio-section" id="studio"><div className="section-kicker">01 — THE STUDIO</div><div className="section-title-row"><div><h2>Start with a <em>feeling.</em></h2><p>Describe the world you want to create. We’ll shape the next steps together.</p></div><span className="engine-pill">● AIPLAY ENGINE · PREVIEW</span></div>
+<div className="studio-grid"><div className="prompt-panel"><div className="panel-top"><span>YOUR CREATIVE BRIEF</span><span>01 / 03</span></div><label className="sr-only" htmlFor="prompt">Describe your idea</label><textarea id="prompt" maxLength={600} value={prompt} onChange={e=>setPrompt(e.target.value)} placeholder="A cinematic music video set in Kampala at golden hour, with city lights, expressive movement and a soulful Afro-fusion sound..."/><div className="prompt-bottom"><span>Describe the mood, setting, sound and story.</span><span>{prompt.length}/600</span></div><div className="studio-controls"><div><label>CANVAS FORMAT</label><div className="format-options">{["9:16","16:9","1:1"].map(f=><button key={f} className={format===f?"format selected":"format"} onClick={()=>setFormat(f)}>{f}</button>)}</div></div><div><label>FIRST CUT</label><strong>15–30 seconds　⌄</strong></div></div><button className="generate-button" onClick={create}>Shape my story ↗</button>{notice&&<p className="notice" role="status">{notice}</p>}<p className="privacy-note">Preview only · Your prompt stays in this browser. No media is uploaded or generated.</p></div>
+<aside className="starter-panel"><div className="panel-top"><span>QUICK START</span><span>CHOOSE A DIRECTION</span></div>{starters.map((s,i)=><button className="starter-row" key={s.title} onClick={()=>{setPrompt(s.prompt);setNotice("");}}><span className="starter-number">0{i+1}</span><span className="starter-symbol">{s.icon}</span><span className="starter-copy"><b>{s.title}</b><small>{s.desc}</small></span><span>↗</span></button>)}<p className="starter-tip">✦ Tip: combine a place, a mood and a camera feeling to make your prompt more vivid.</p></aside></div></section>
+<section className="inspiration-section" id="inspiration"><div className="section-kicker">02 — VISUAL PLAYGROUND</div><div className="section-title-row"><div><h2>See where ideas <em>can go.</em></h2><p>Visual references to spark your next direction.</p></div><a className="text-link" href="https://unsplash.com" target="_blank" rel="noreferrer">Explore photography ↗</a></div><div className="showcase-grid">{cards.map((c,i)=><a className={`showcase-card card-${i+1}`} href={c.src} target="_blank" rel="noreferrer" key={c.title}><img src={c.src} alt={c.alt} loading="lazy"/><span className="showcase-overlay"/><small>{c.tag}</small><b>{c.title} <i>↗</i></b></a>)}</div><p className="image-credit">Photography references via <a href="https://unsplash.com" target="_blank" rel="noreferrer">Unsplash</a>. These are inspiration images, not generated Riplay outputs.</p></section>
+<section className="about-strip" id="about"><div className="about-mark">R<span>.</span></div><div><div className="section-kicker">03 — MADE FOR CREATORS</div><h2>A canvas without borders.</h2><p>Riplay is being built for creators everywhere, with a special love for African stories, sounds and perspectives.</p></div><a href="https://github.com/Muwanguzi12/Aiplay-" target="_blank" rel="noreferrer">Follow the build ↗</a></section>
+<footer className="site-footer"><a className="footer-brand" href="#home">riplay<span>.</span></a><span>YOUR IMAGINATION, IN MOTION.</span><div><a href="https://github.com/Muwanguzi12/Aiplay-" target="_blank" rel="noreferrer">GitHub</a><a href="https://unsplash.com" target="_blank" rel="noreferrer">Image source</a><a href="#studio">Studio ↑</a></div></footer></main>}
