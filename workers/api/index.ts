@@ -178,7 +178,7 @@ export default {
     if (jobMatch && request.method === "GET") {
       const row = await env.DB.prepare(
         `SELECT j.id, j.status, j.provider, j.error_code, j.created_at, j.updated_at,
-                a.id AS output_asset_id
+                a.id AS output_asset_id, j.output_duration_seconds
          FROM generation_jobs j
          LEFT JOIN media_assets a ON a.object_key = j.output_asset_key
          WHERE j.id = ? AND j.owner_id = ?`
@@ -351,9 +351,9 @@ export default {
 
           await env.DB.prepare(
             `UPDATE generation_jobs SET status = 'succeeded', provider = 'nvidia-cosmos3-nano',
-               output_asset_key = ?, error_code = NULL, updated_at = ${now()}
+               output_asset_key = ?, output_duration_seconds = ?, error_code = NULL, updated_at = ${now()}
              WHERE id = ? AND owner_id = ?`
-          ).bind(objectKey, job.jobId, job.ownerId).run();
+          ).bind(objectKey, frames / fps, job.jobId, job.ownerId).run();
         } catch (storageError) {
           await env.MEDIA.delete(objectKey).catch(() => undefined);
           throw storageError;
