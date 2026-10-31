@@ -1,5 +1,3 @@
-import { createRemoteJWKSet, jwtVerify } from "jose";
-
 interface Env {
   DB: D1Database;
   MEDIA: R2Bucket;
@@ -49,10 +47,10 @@ const json = (data: unknown, status = 200, origin = "*") =>
 
 async function authenticate(request: Request, env: Env): Promise<AuthUser | null> {
   const authorization = request.headers.get("authorization") ?? "";
-  const match = authorization.match(/^Bearer\\s+(.+)$/i);
+  const match = authorization.match(/^Bearer\s+(.+)$/i);
   if (!match || !env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) return null;
   try {
-    const response = await fetch(`${env.SUPABASE_URL.replace(/\\/$/, "")}/auth/v1/user`, {
+    const response = await fetch(`${env.SUPABASE_URL.replace(/\/$/, "")}/auth/v1/user`, {
       headers: {
         apikey: env.SUPABASE_ANON_KEY,
         authorization: `Bearer ${match[1]}`
