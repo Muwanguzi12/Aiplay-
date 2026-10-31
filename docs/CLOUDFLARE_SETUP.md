@@ -1,77 +1,57 @@
 # Cloudflare setup
 
-This repository uses two Workers:
+## Identity for the private beta
 
-- `riplay-web`: the existing Next.js 15 web studio, deployed with the Cloudflare OpenNext adapter.
-- `riplay-api`: a separate TypeScript Worker for job creation/status, D1, R2 and Queue bindings.
+The API now validates Cloudflare Access JWTs using the issuer's public JWKS and the configured audience. This is suitable for a restricted beta behind Cloudflare Access; it is **not** a public creator sign-in experience. Before public launch, replace or extend this gate with a consumer identity provider and preserve the same verified-subject ownership model.
 
-Cloudflare currently recommends vinext for new Next.js-on-Workers projects. This repository is on Next.js 15.5, so this first deployment layer uses the documented OpenNext maintenance path rather than attempting an untested framework migration. Revisit vinext after compatibility testing.
+1. Create a Cloudflare Access self-hosted application for the API.
+2. Restrict its policy to approved beta testers.
+3. Copy the team domain and Application Audience (AUD) tag into `wrangler.api.jsonc`.
+4. Set `ALLOWED_ORIGIN` to the exact web app origin.
+5. Ensure the web app's requests reach the API with a valid `Cf-Access-Jwt-Assertion` header. Do not accept a user ID supplied in request JSON as proof of identity.
 
-## 1. Prerequisites
+The Worker verifies JWT signature, issuer, audience and subject. Every project, job and asset query is scoped to that verified subject.
 
-- Node.js 20.9 or later
-- A Cloudflare account
-- Access to the Cloudflare account's Workers, D1, R2 and Queues products
+## Cloudflare resources
 
-## 2. Install dependencies
+Create:
+- D1 database `riplay-db`
+- R2 bucket `riplay-media`
+- Queue `riplay-generation`
+- Dead-letter Queue `riplay-generation-dlq`
 
-```bash
-npm install
-```
-
-## 3. Create Cloudflare resources
-
-Create a D1 database named `riplay-db`, an R2 bucket named `riplay-media`, a Queue named `riplay-generation`, and a dead-letter Queue named `riplay-generation-dlq`.
-
-Then update `wrangler.api.jsonc`:
-- Replace `REPLACE_WITH_D1_DATABASE_ID` with the D1 database ID.
-- Confirm the R2 and Queue names match the resources created in your account.
-
-Apply the schema:
+Replace the D1 database ID in `wrangler.api.jsonc`, then apply migrations:
 
 ```bash
 npx wrangler d1 migrations apply riplay-db --remote --config wrangler.api.jsonc
 ```
 
-## 4. Configure secrets
+## API capabilities
 
-Set the API's server-to-server token as a Worker secret. Do not put it in source control or in a browser-exposed `NEXT_PUBLIC_*` variable.
+- `GET /health` — public health check.
+- `GET /v1/projects`, `POST /v1/projects` — authenticated, owner-scoped projects.
+- `POST /v1/jobs`, `GET /v1/jobs/:id` — authenticated generation job creation/status.
+- `POST /v1/assets?projectId=<optional-id>` — authenticated binary upload to private R2.
+- `GET /v1/assets/:id` — authenticated, owner-scoped media retrieval.
 
-```bash
-npx wrangler secret put RIPLAY_API_TOKEN --config wrangler.api.jsonc
-```
+Uploads are limited to 25 MiB and an allowlist of image/audio/video MIME types. Objects use server-generated keys and are private by default. The Worker streams uploads into R2 rather than exposing bucket credentials or public object URLs.
 
-The current API token gate is a temporary service-to-service boundary, not end-user authentication. Before exposing project/job endpoints to the public web app, implement user sign-in and verify the user's identity and ownership on every request. Never ship the shared token to the browser.
-
-## 5. Local development
-
-```bash
-npm run dev
-npx wrangler dev --config wrangler.api.jsonc
-```
-
-The API health endpoint is `/health`. Protected endpoints require the server-to-server bearer token.
-
-## 6. Deploy
-
-Authenticate Wrangler interactively on your own machine:
+## Deploy
 
 ```bash
+npm install
 npx wrangler login
 npm run cf:deploy:api
-npm run cf:deploy:web
 ```
 
-Web deployment uses the OpenNext adapter. API deployment uses `wrangler.api.jsonc`.
+## Important limits before public launch
 
-## Current limitations
+- Cloudflare Access is currently the beta identity gate. Add consumer login (OIDC/OAuth) before public onboarding.
+- Add rate limits, per-user storage quotas, content scanning, media duration/dimension checks and abuse reporting before opening uploads broadly.
+- The queue consumer deliberately retries while no real generation provider is configured.
+- Browser upload uses the Worker as a streaming proxy. For large media, consider short-lived R2 presigned PUT URLs with strict content-type and object-key constraints. R2 presigned URLs are bearer credentials and must be kept short-lived.
+- Configure the R2 bucket's CORS only for the intended web origin if direct browser-to-R2 uploads are later enabled.
 
-- The queue consumer intentionally does not call a model yet. It retries messages until a real provider adapter is configured; no fake success response is returned.
-- The API is not ready for public end-user traffic until real authentication, per-user authorization, rate limiting, request quotas and provider cost controls are added.
-- R2 upload/download endpoints and signed upload URLs are not implemented yet.
-- Social publishing is not implemented. Future integrations must use official platform authorization flows.
-- Replace the example CORS origin in `workers/api/index.ts` with the actual deployed web origin before browser integration.
-
-## Operational security
-
-Store provider credentials with Worker secrets. Keep media private by default, validate MIME type and size, and issue short-lived upload/download authorization only after checking asset ownership.
+Cloudflare references:
+- [Validate Cloudflare Access JWTs](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/validating-json/)
+- [R2 presigned URLs and upload security](https://developers.cloudflare.com/r2/api/s3/presigned-urls/)
