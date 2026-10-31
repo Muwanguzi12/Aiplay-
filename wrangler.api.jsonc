@@ -11,8 +11,8 @@
   },
   "vars": {
     "ALLOWED_ORIGIN": "https://YOUR-RIPLAY-DOMAIN",
-    "SUPABASE_URL": "https://YOUR-PROJECT-REF.supabase.co",
-    "SUPABASE_ANON_KEY": "REPLACE_WITH_SUPABASE_PUBLISHABLE_OR_ANON_KEY"
+    "SUPABASE_URL": "https://dxcklcpxoxlmrbaqsxqi.supabase.co",
+    "SUPABASE_ANON_KEY": "sb_publishable_-ThqstC0cdoGJthQZxpwfg_gUt081uZ"
   },
   "d1_databases": [
     {
