@@ -7,6 +7,9 @@ interface Env {
   SUPABASE_URL: string;
   SUPABASE_ANON_KEY: string;
   ALLOWED_ORIGIN: string;
+  NVIDIA_API_KEY?: string;
+  NVIDIA_API_URL?: string;
+  NVIDIA_MODEL_ID?: string;
 }
 
 interface GenerationMessage {
@@ -174,8 +177,11 @@ export default {
     const jobMatch = url.pathname.match(/^\/v1\/jobs\/([0-9a-f-]{36})$/i);
     if (jobMatch && request.method === "GET") {
       const row = await env.DB.prepare(
-        `SELECT id, status, provider, output_asset_key, error_code, created_at, updated_at
-         FROM generation_jobs WHERE id = ? AND owner_id = ?`
+        `SELECT j.id, j.status, j.provider, j.error_code, j.created_at, j.updated_at,
+                a.id AS output_asset_id
+         FROM generation_jobs j
+         LEFT JOIN media_assets a ON a.object_key = j.output_asset_key
+         WHERE j.id = ? AND j.owner_id = ?`
       ).bind(jobMatch[1], user.id).first();
       return row ? json(row, 200, origin) : json({ error: "not_found" }, 404, origin);
     }
@@ -258,11 +264,113 @@ export default {
 
   async queue(batch: MessageBatch<GenerationMessage>, env: Env): Promise<void> {
     for (const message of batch.messages) {
-      // Provider adapter is not configured yet. Do not fake a successful render.
-      console.log("Generation job awaiting provider configuration", {
-        jobId: message.body.jobId
-      });
-      message.retry({ delaySeconds: 60 });
+      const job = message.body;
+      const now = () => "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
+      const updateFailure = async (code: string) => {
+        await env.DB.prepare(
+          `UPDATE generation_jobs SET status = 'failed', error_code = ?, updated_at = ${now()} WHERE id = ? AND status != 'succeeded'`
+        ).bind(code, job.jobId).run();
+      };
+
+      if (!env.NVIDIA_API_KEY) {
+        await updateFailure("nvidia_api_key_missing");
+        message.ack();
+        continue;
+      }
+
+      try {
+        await env.DB.prepare(
+          `UPDATE generation_jobs SET status = 'processing', provider = 'nvidia-cosmos3-nano',
+             updated_at = ${now()} WHERE id = ? AND status IN ('queued', 'processing')`
+        ).bind(job.jobId).run();
+
+        // Cosmos3 Nano's hosted Preview API currently returns a base64 MP4.
+        // Its 480p profile supports at most 297 frames; this produces a clip
+        // up to 12.375 seconds at 24 FPS. Longer timelines require a later
+        // multi-shot assembly pipeline rather than pretending one call made them.
+        const fps = 24;
+        const frames = Math.min(297, Math.max(25, 4 * Math.floor((job.durationSeconds * fps - 1) / 4) + 1));
+        const ratio = job.aspectRatio.replace(":", "_");
+        const resolution = `480_${ratio}`;
+        const endpoint = env.NVIDIA_API_URL || "https://ai.api.nvidia.com/v1/cosmos/nvidia/cosmos3-nano";
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${env.NVIDIA_API_KEY}`,
+            accept: "application/json",
+            "content-type": "application/json"
+          },
+          body: JSON.stringify({
+            model_mode: "text2video",
+            prompt: job.prompt,
+            resolution,
+            num_frames: frames,
+            num_inference_steps: 35,
+            fps,
+            seed: Math.floor(Math.random() * 2147483647)
+          }),
+          signal: AbortSignal.timeout(12 * 60 * 1000)
+        });
+
+        if (!response.ok) {
+          const detail = (await response.text()).slice(0, 1200);
+          console.error("NVIDIA generation request failed", { jobId: job.jobId, status: response.status, detail });
+          if (response.status === 429 || response.status >= 500) {
+            message.retry({ delaySeconds: Math.min(300, 30 * Math.max(1, message.attempts)) });
+            continue;
+          }
+          await updateFailure(response.status === 401 || response.status === 403 ? "nvidia_auth_failed" : "nvidia_request_rejected");
+          message.ack();
+          continue;
+        }
+
+        const payload = await response.json() as { b64_video?: unknown };
+        if (typeof payload.b64_video !== "string" || !payload.b64_video.length) {
+          await updateFailure("nvidia_empty_video_response");
+          message.ack();
+          continue;
+        }
+
+        const binary = atob(payload.b64_video);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        const assetId = crypto.randomUUID();
+        const objectKey = `users/${encodeURIComponent(job.ownerId)}/generated/${assetId}.mp4`;
+        await env.MEDIA.put(objectKey, bytes, {
+          httpMetadata: { contentType: "video/mp4" },
+          customMetadata: { ownerId: job.ownerId, assetId, jobId: job.jobId, provider: "nvidia-cosmos3-nano" }
+        });
+
+        try {
+          await env.DB.prepare(
+            `INSERT INTO media_assets
+              (id, owner_id, project_id, object_key, media_type, content_type, size_bytes)
+             SELECT ?, owner_id, project_id, ?, 'video', 'video/mp4', ?
+             FROM generation_jobs WHERE id = ? AND owner_id = ?`
+          ).bind(assetId, objectKey, bytes.byteLength, job.jobId, job.ownerId).run();
+
+          await env.DB.prepare(
+            `UPDATE generation_jobs SET status = 'succeeded', provider = 'nvidia-cosmos3-nano',
+               output_asset_key = ?, error_code = NULL, updated_at = ${now()}
+             WHERE id = ? AND owner_id = ?`
+          ).bind(objectKey, job.jobId, job.ownerId).run();
+        } catch (storageError) {
+          await env.MEDIA.delete(objectKey).catch(() => undefined);
+          throw storageError;
+        }
+        message.ack();
+      } catch (error) {
+        console.error("Aiplay generation failed", {
+          jobId: job.jobId,
+          error: error instanceof Error ? error.message : "unknown_error"
+        });
+        if (message.attempts >= 3) {
+          await updateFailure("generation_provider_failed");
+          message.ack();
+        } else {
+          message.retry({ delaySeconds: Math.min(300, 30 * Math.max(1, message.attempts)) });
+        }
+      }
     }
   }
 } satisfies ExportedHandler<Env, GenerationMessage>;
