@@ -28,6 +28,16 @@ Next.js 15, React, TypeScript, Supabase Auth, and a Cloudflare Workers/D1/R2/Que
 
 The browser uses the Supabase PKCE flow. The publishable key is intended for browser use; never put a service-role/secret key in `NEXT_PUBLIC_*` or commit it. Restrict redirect URLs to your own domains.
 
+## Enable NVIDIA video generation
+
+Set the API key in the Cloudflare Worker secret store (never commit it):
+
+```bash
+npx wrangler secret put NVIDIA_API_KEY --config wrangler.api.jsonc
+```
+
+Use the NVIDIA Cosmos3 Nano hosted endpoint by default. If NVIDIA supplies a different invocation URL for your account, set `NVIDIA_API_URL` as a Worker variable. The web app also needs `NEXT_PUBLIC_AIPLAY_API_URL` set to the deployed API Worker URL. The studio requires a signed-in Supabase session before it can submit a job.
+
 ## Run locally
 
 Requirements: Node.js 20.9+ and npm.
@@ -55,7 +65,7 @@ This repository has a Cloudflare deployment foundation and a restricted-beta ide
 3. Configure Supabase project credentials, Google OAuth provider credentials, email delivery, and production redirect URLs.
 4. Add durable rate limiting and per-user storage quotas.
 5. Validate media signatures, dimensions, duration and safe content.
-6. Connect and test a licensed AI video-generation provider.
+6. Add the NVIDIA API key as a Cloudflare Worker secret and run a live Cosmos3 Nano text-to-video test. The hosted endpoint is a preview API and its availability/rate limits are controlled by NVIDIA.
 7. Add monitoring, billing/cost limits, backups and incident procedures.
 
 Never commit credentials. Obtain permission before using someone's voice or likeness. Social publishing must use official platform APIs and explicit user authorization.
