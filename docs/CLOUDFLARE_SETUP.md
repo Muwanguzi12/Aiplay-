@@ -50,11 +50,15 @@ Create:
 - Queue `riplay-generation`
 - Dead-letter Queue `riplay-generation-dlq`
 
-Replace the D1 database ID in `wrangler.api.jsonc`, then apply migrations:
+Replace the D1 database ID in `wrangler.api.jsonc`, then apply migrations and deploy the API Worker:
 
 ```bash
 npx wrangler d1 migrations apply riplay-db --remote --config wrangler.api.jsonc
+npx wrangler secret put NVIDIA_API_KEY --config wrangler.api.jsonc
+npm run cf:deploy:api
 ```
+
+After deployment, copy the API Worker URL from Wrangler/Cloudflare and set `NEXT_PUBLIC_AIPLAY_API_URL` to that URL in the web app's build environment. Rebuild and deploy the web app so the browser uses the deployed API. Also add `https://aiplay.necxa.uk/**` to Supabase Authentication → URL Configuration allowed redirect URLs and set the production Site URL.
 
 ## API capabilities
 
