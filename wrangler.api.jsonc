@@ -9,6 +9,7 @@
   "observability": {
     "enabled": true
   },
+  "triggers": { "crons": ["*/15 * * * *"] },
   "vars": {
     "ALLOWED_ORIGIN": "https://aiplay.necxa.uk",
     "SUPABASE_URL": "https://dxcklcpxoxlmrbaqsxqi.supabase.co",

@@ -1,4 +1,5 @@
 /// <reference types="@cloudflare/workers-types" />
+import { generateCosmos3NanoVideo } from "./providers";
 
 interface Env {
   DB: D1Database;
@@ -93,7 +94,13 @@ export default {
     }
 
     if (url.pathname === "/health" && request.method === "GET") {
-      return json({ ok: true, service: "riplay-api", version: "0.2.0" }, 200, origin);
+      return json({ ok: true, service: "riplay-api", version: "0.3.0", providerConfigured: Boolean(env.NVIDIA_API_KEY), databaseConfigured: Boolean(env.DB), queueConfigured: Boolean(env.GENERATION_QUEUE), mediaConfigured: Boolean(env.MEDIA) }, 200, origin);
+    }
+
+    if (url.pathname === "/health/diagnostics" && request.method === "GET") {
+      let databaseReady = false;
+      try { await env.DB.prepare("SELECT 1").first(); databaseReady = true; } catch { /* Keep diagnostics free of credentials. */ }
+      return json({ ok: databaseReady, service: "riplay-api", databaseReady, providerConfigured: Boolean(env.NVIDIA_API_KEY), queueConfigured: Boolean(env.GENERATION_QUEUE), mediaConfigured: Boolean(env.MEDIA) }, databaseReady ? 200 : 503, origin);
     }
 
     if (origin && origin !== env.ALLOWED_ORIGIN) {
@@ -178,9 +185,11 @@ export default {
     if (jobMatch && request.method === "GET") {
       const row = await env.DB.prepare(
         `SELECT j.id, j.status, j.provider, j.error_code, j.created_at, j.updated_at,
-                a.id AS output_asset_id, j.output_duration_seconds
+                a.id AS output_asset_id, j.output_duration_seconds,
+                CASE WHEN j.output_expires_at IS NOT NULL AND j.output_expires_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now') THEN 'failed' ELSE j.status END AS status,
+                CASE WHEN j.output_expires_at IS NOT NULL AND j.output_expires_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now') THEN 'output_expired' ELSE j.error_code END AS error_code
          FROM generation_jobs j
-         LEFT JOIN media_assets a ON a.object_key = j.output_asset_key
+         LEFT JOIN media_assets a ON a.object_key = j.output_asset_key AND (a.expires_at IS NULL OR a.expires_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
          WHERE j.id = ? AND j.owner_id = ?`
       ).bind(jobMatch[1], user.id).first();
       return row ? json(row, 200, origin) : json({ error: "not_found" }, 404, origin);
@@ -247,7 +256,7 @@ export default {
     const assetMatch = url.pathname.match(/^\/v1\/assets\/([0-9a-f-]{36})$/i);
     if (assetMatch && request.method === "GET") {
       const asset = await env.DB.prepare(
-        "SELECT object_key, content_type FROM media_assets WHERE id = ? AND owner_id = ?"
+        "SELECT object_key, content_type FROM media_assets WHERE id = ? AND owner_id = ? AND (expires_at IS NULL OR expires_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
       ).bind(assetMatch[1], user.id).first<{ object_key: string; content_type: string }>();
       if (!asset) return json({ error: "not_found" }, 404, origin);
       const object = await env.MEDIA.get(asset.object_key);
@@ -260,6 +269,19 @@ export default {
     }
 
     return json({ error: "not_found" }, 404, origin);
+  },
+
+  async scheduled(_controller: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
+    const expired = await env.DB.prepare("SELECT id, object_key FROM media_assets WHERE expires_at IS NOT NULL AND expires_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now') LIMIT 100").all<{ id: string; object_key: string }>();
+    for (const asset of expired.results ?? []) {
+      try {
+        await env.MEDIA.delete(asset.object_key);
+        await env.DB.prepare("DELETE FROM media_assets WHERE id = ? AND expires_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now')").bind(asset.id).run();
+      } catch (error) {
+        console.error("Temporary media cleanup failed", { assetId: asset.id, error: error instanceof Error ? error.message : "unknown_error" });
+      }
+    }
+    await env.DB.prepare("UPDATE generation_jobs SET status = 'failed', error_code = 'output_expired', updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE status = 'succeeded' AND output_expires_at IS NOT NULL AND output_expires_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now')").run();
   },
 
   async queue(batch: MessageBatch<GenerationMessage>, env: Env): Promise<void> {
@@ -284,56 +306,18 @@ export default {
              updated_at = ${now()} WHERE id = ? AND status IN ('queued', 'processing')`
         ).bind(job.jobId).run();
 
-        // Cosmos3 Nano's hosted Preview API currently returns a base64 MP4.
-        // Its 480p profile supports at most 297 frames; this produces a clip
-        // up to 12.375 seconds at 24 FPS. Longer timelines require a later
-        // multi-shot assembly pipeline rather than pretending one call made them.
+        // Provider request construction and response parsing are isolated in an adapter.
         const fps = 24;
         const frames = Math.min(297, Math.max(25, 4 * Math.floor((job.durationSeconds * fps - 1) / 4) + 1));
-        const ratio = job.aspectRatio.replace(":", "_");
-        const resolution = `480_${ratio}`;
-        const endpoint = env.NVIDIA_API_URL || "https://ai.api.nvidia.com/v1/cosmos/nvidia/cosmos3-nano";
-        const response = await fetch(endpoint, {
-          method: "POST",
-          headers: {
-            authorization: `Bearer ${env.NVIDIA_API_KEY}`,
-            accept: "application/json",
-            "content-type": "application/json"
-          },
-          body: JSON.stringify({
-            model_mode: "text2video",
-            prompt: job.prompt,
-            resolution,
-            num_frames: frames,
-            num_inference_steps: 35,
-            fps,
-            seed: Math.floor(Math.random() * 2147483647)
-          }),
-          signal: AbortSignal.timeout(12 * 60 * 1000)
+        const bytes = await generateCosmos3NanoVideo({
+          apiKey: env.NVIDIA_API_KEY,
+          endpoint: env.NVIDIA_API_URL,
+          prompt: job.prompt,
+          aspectRatio: job.aspectRatio,
+          frames,
+          fps
         });
 
-        if (!response.ok) {
-          const detail = (await response.text()).slice(0, 1200);
-          console.error("NVIDIA generation request failed", { jobId: job.jobId, status: response.status, detail });
-          if (response.status === 429 || response.status >= 500) {
-            message.retry({ delaySeconds: Math.min(300, 30 * Math.max(1, message.attempts)) });
-            continue;
-          }
-          await updateFailure(response.status === 401 || response.status === 403 ? "nvidia_auth_failed" : "nvidia_request_rejected");
-          message.ack();
-          continue;
-        }
-
-        const payload = await response.json() as { b64_video?: unknown };
-        if (typeof payload.b64_video !== "string" || !payload.b64_video.length) {
-          await updateFailure("nvidia_empty_video_response");
-          message.ack();
-          continue;
-        }
-
-        const binary = atob(payload.b64_video);
-        const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
         const assetId = crypto.randomUUID();
         const objectKey = `users/${encodeURIComponent(job.ownerId)}/generated/${assetId}.mp4`;
         await env.MEDIA.put(objectKey, bytes, {
@@ -344,14 +328,14 @@ export default {
         try {
           await env.DB.prepare(
             `INSERT INTO media_assets
-              (id, owner_id, project_id, object_key, media_type, content_type, size_bytes)
-             SELECT ?, owner_id, project_id, ?, 'video', 'video/mp4', ?
+              (id, owner_id, project_id, object_key, media_type, content_type, size_bytes, expires_at)
+             SELECT ?, owner_id, project_id, ?, 'video', 'video/mp4', ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+1 hour')
              FROM generation_jobs WHERE id = ? AND owner_id = ?`
           ).bind(assetId, objectKey, bytes.byteLength, job.jobId, job.ownerId).run();
 
           await env.DB.prepare(
             `UPDATE generation_jobs SET status = 'succeeded', provider = 'nvidia-cosmos3-nano',
-               output_asset_key = ?, output_duration_seconds = ?, error_code = NULL, updated_at = ${now()}
+               output_asset_key = ?, output_duration_seconds = ?, output_expires_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+1 hour'), error_code = NULL, updated_at = ${now()}
              WHERE id = ? AND owner_id = ?`
           ).bind(objectKey, frames / fps, job.jobId, job.ownerId).run();
         } catch (storageError) {
