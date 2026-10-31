@@ -1,5 +1,5 @@
 /// <reference types="@cloudflare/workers-types" />
-import { generateCosmos3NanoVideo } from "./providers";
+import { generateCosmos3NanoVideo, generateFalKlingVideo } from "./providers";
 
 interface Env {
   DB: D1Database;
@@ -11,6 +11,8 @@ interface Env {
   NVIDIA_API_KEY?: string;
   NVIDIA_API_URL?: string;
   NVIDIA_MODEL_ID?: string;
+  VIDEO_PROVIDER?: string;
+  FAL_API_KEY?: string;
 }
 
 interface GenerationMessage {
@@ -94,13 +96,13 @@ export default {
     }
 
     if (url.pathname === "/health" && request.method === "GET") {
-      return json({ ok: true, service: "riplay-api", version: "0.3.0", providerConfigured: Boolean(env.NVIDIA_API_KEY), databaseConfigured: Boolean(env.DB), queueConfigured: Boolean(env.GENERATION_QUEUE), mediaConfigured: Boolean(env.MEDIA) }, 200, origin);
+      return json({ ok: true, service: "riplay-api", version: "0.3.0", providerConfigured: Boolean((env.VIDEO_PROVIDER === 'fal-kling-v2.5-pro' && env.FAL_API_KEY) || (env.VIDEO_PROVIDER !== 'fal-kling-v2.5-pro' && env.NVIDIA_API_KEY)), databaseConfigured: Boolean(env.DB), queueConfigured: Boolean(env.GENERATION_QUEUE), mediaConfigured: Boolean(env.MEDIA) }, 200, origin);
     }
 
     if (url.pathname === "/health/diagnostics" && request.method === "GET") {
       let databaseReady = false;
       try { await env.DB.prepare("SELECT 1").first(); databaseReady = true; } catch { /* Keep diagnostics free of credentials. */ }
-      return json({ ok: databaseReady, service: "riplay-api", databaseReady, providerConfigured: Boolean(env.NVIDIA_API_KEY), queueConfigured: Boolean(env.GENERATION_QUEUE), mediaConfigured: Boolean(env.MEDIA) }, databaseReady ? 200 : 503, origin);
+      return json({ ok: databaseReady, service: "riplay-api", databaseReady, providerConfigured: Boolean((env.VIDEO_PROVIDER === 'fal-kling-v2.5-pro' && env.FAL_API_KEY) || (env.VIDEO_PROVIDER !== 'fal-kling-v2.5-pro' && env.NVIDIA_API_KEY)), queueConfigured: Boolean(env.GENERATION_QUEUE), mediaConfigured: Boolean(env.MEDIA) }, databaseReady ? 200 : 503, origin);
     }
 
     if (origin && origin !== env.ALLOWED_ORIGIN) {
@@ -294,29 +296,44 @@ export default {
         ).bind(code, job.jobId).run();
       };
 
-      if (!env.NVIDIA_API_KEY) {
+      const selectedProvider = env.VIDEO_PROVIDER || "nvidia-cosmos3-nano";
+      if (selectedProvider !== "nvidia-cosmos3-nano" && selectedProvider !== "fal-kling-v2.5-pro") {
+        await updateFailure("video_provider_unsupported");
+        message.ack();
+        continue;
+      }
+      if (selectedProvider === "nvidia-cosmos3-nano" && !env.NVIDIA_API_KEY) {
         await updateFailure("nvidia_api_key_missing");
+        message.ack();
+        continue;
+      }
+      if (selectedProvider === "fal-kling-v2.5-pro" && !env.FAL_API_KEY) {
+        await updateFailure("fal_api_key_missing");
         message.ack();
         continue;
       }
 
       try {
         await env.DB.prepare(
-          `UPDATE generation_jobs SET status = 'processing', provider = 'nvidia-cosmos3-nano',
+          `UPDATE generation_jobs SET status = 'processing', provider = ?,
              updated_at = ${now()} WHERE id = ? AND status IN ('queued', 'processing')`
-        ).bind(job.jobId).run();
+        ).bind(selectedProvider, job.jobId).run();
 
-        // Provider request construction and response parsing are isolated in an adapter.
+        // Provider request construction and response parsing are isolated in adapters.
         const fps = 24;
         const frames = Math.min(297, Math.max(25, 4 * Math.floor((job.durationSeconds * fps - 1) / 4) + 1));
-        const bytes = await generateCosmos3NanoVideo({
-          apiKey: env.NVIDIA_API_KEY,
-          endpoint: env.NVIDIA_API_URL,
-          prompt: job.prompt,
-          aspectRatio: job.aspectRatio,
-          frames,
-          fps
-        });
+        const generated = selectedProvider === "fal-kling-v2.5-pro"
+          ? await generateFalKlingVideo({ apiKey: env.FAL_API_KEY!, prompt: job.prompt, aspectRatio: job.aspectRatio })
+          : await generateCosmos3NanoVideo({
+              apiKey: env.NVIDIA_API_KEY,
+              endpoint: env.NVIDIA_API_URL,
+              prompt: job.prompt,
+              aspectRatio: job.aspectRatio,
+              frames,
+              fps
+            });
+        const bytes = generated.bytes;
+        const actualDurationSeconds = generated.durationSeconds;
 
         const assetId = crypto.randomUUID();
         const objectKey = `users/${encodeURIComponent(job.ownerId)}/generated/${assetId}.mp4`;
@@ -334,10 +351,10 @@ export default {
           ).bind(assetId, objectKey, bytes.byteLength, job.jobId, job.ownerId).run();
 
           await env.DB.prepare(
-            `UPDATE generation_jobs SET status = 'succeeded', provider = 'nvidia-cosmos3-nano',
+            `UPDATE generation_jobs SET status = 'succeeded', provider = ?,
                output_asset_key = ?, output_duration_seconds = ?, output_expires_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+1 hour'), error_code = NULL, updated_at = ${now()}
              WHERE id = ? AND owner_id = ?`
-          ).bind(objectKey, frames / fps, job.jobId, job.ownerId).run();
+          ).bind(selectedProvider, objectKey, actualDurationSeconds, job.jobId, job.ownerId).run();
         } catch (storageError) {
           await env.MEDIA.delete(objectKey).catch(() => undefined);
           throw storageError;

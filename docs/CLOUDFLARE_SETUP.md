@@ -40,7 +40,17 @@ npx wrangler secret put NVIDIA_API_KEY --config wrangler.api.jsonc
 
 Do not add the key to `vars`, source files, GitHub Actions logs, or browser environment variables. The default endpoint is `https://ai.api.nvidia.com/v1/cosmos/nvidia/cosmos3-nano`. If NVIDIA has issued a different invocation URL for your account, configure `NVIDIA_API_URL` as a Worker variable. The provider adapter submits `text2video` and receives `b64_video`. Generated MP4s are placed in private R2 for delivery with a one-hour TTL; a 15-minute scheduled cleanup deletes expired objects and records, and authenticated reads reject expired output if cleanup is delayed. The studio needs `NEXT_PUBLIC_AIPLAY_API_URL` set to the deployed API Worker URL.
 
-The current hosted adapter uses 480p and 24 FPS, with NVIDIA's 297-frame limit (about 12.4 seconds maximum per clip). The existing 15–60 second UI request is capped to the endpoint's supported maximum; the job response reports the actual clip duration. Longer multi-shot editing and image-to-video are future work. NVIDIA controls preview endpoint eligibility, throttling and availability.
+The NVIDIA adapter uses 480p and 24 FPS, with NVIDIA's 297-frame limit (about 12.4 seconds maximum per clip). The existing 15–60 second UI request is capped to the endpoint's supported maximum; the job response reports the actual clip duration. Longer multi-shot editing and image-to-video are future work. NVIDIA controls preview endpoint eligibility, throttling and availability.
+
+### Optional fal.ai Kling adapter
+
+A second server-side adapter supports the documented fal.ai Kling 2.5 Turbo Pro text-to-video queue. Set the Worker variable `VIDEO_PROVIDER` to `fal-kling-v2.5-pro` and add the API credential as an encrypted Worker secret:
+
+```bash
+npx wrangler secret put FAL_API_KEY --config wrangler.api.jsonc
+```
+
+It submits a 5-second clip using the documented fal queue API, polls the returned status URL, fetches the MP4, and hands it to the same temporary one-hour delivery path. fal.ai billing, rate limits and file hosting policies apply. Do not set the provider variable until the key is configured. NVIDIA remains the default.
 
 ## Cloudflare API resources
 
@@ -73,6 +83,6 @@ Uploads are limited to 25 MiB and an allowlist of image/audio/video MIME types. 
 ## Important limits before public launch
 
 - Add rate limits, per-user storage quotas, content scanning, media duration/dimension checks and abuse reporting before opening uploads broadly.
-- The queue consumer invokes NVIDIA Cosmos3 Nano and stores successful MP4 output in private R2 for **one hour only**. A 15-minute Cron Trigger cleans expired objects and D1 records; API reads reject expired output even if cleanup is delayed. The browser must download within that window; no permanent generated-video archive is kept. Generation requires `NVIDIA_API_KEY` and an enabled NVIDIA hosted endpoint.
+- The queue consumer invokes NVIDIA Cosmos3 Nano and stores successful MP4 output in private R2 for **one hour only**. A 15-minute Cron Trigger cleans expired objects and D1 records; API reads reject expired output even if cleanup is delayed. The browser must download within that window; no permanent generated-video archive is kept. Generation requires credentials and eligibility for the selected provider. NVIDIA is selected by default; fal.ai Kling 2.5 Turbo Pro is optional.
 - Browser upload uses the Worker as a streaming proxy. For large media, consider short-lived R2 presigned PUT URLs with strict content-type and object-key constraints. R2 presigned URLs are bearer credentials and must be kept short-lived.
 - Configure the R2 bucket's CORS only for the intended web origin if direct browser-to-R2 uploads are later enabled.
