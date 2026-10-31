@@ -5,6 +5,11 @@
   "compatibility_date": "2026-10-30",
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
+  "vars": {
+    "TEAM_DOMAIN": "https://YOUR-TEAM.cloudflareaccess.com",
+    "POLICY_AUD": "REPLACE_WITH_ACCESS_APPLICATION_AUD",
+    "ALLOWED_ORIGIN": "https://YOUR-RIPLAY-DOMAIN"
+  },
   "d1_databases": [
     {
       "binding": "DB",
